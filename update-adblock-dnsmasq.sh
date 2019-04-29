@@ -52,6 +52,7 @@ then
 
 # uncomment the line below, and modify it to remove your favorite sites from the ad blocking list
  sed -i -e '/spclient\.wg\.spotify\.com/d' $temp_ad_file
+ sed -i -e '/paperlesspost\.com/d' $temp_ad_file
  mv $temp_ad_file $ad_file
 else
  echo "Error building the ad list, please try again."
