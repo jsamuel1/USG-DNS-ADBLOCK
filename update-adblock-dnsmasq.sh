@@ -55,6 +55,7 @@ then
  sed -i -e '/paperlesspost\.com/d' $temp_ad_file
  sed -i -e '/grouptogether\.com/d' $temp_ad_file
  sed -i -e '/analytics\.twitter\.com/d' $temp_ad_file
+ sed -i -e '/taste\.com\.au/d' $temp_ad_file
  mv $temp_ad_file $ad_file
 else
  echo "Error building the ad list, please try again."
