@@ -54,6 +54,7 @@ then
  sed -i -e '/spclient\.wg\.spotify\.com/d' $temp_ad_file
  sed -i -e '/paperlesspost\.com/d' $temp_ad_file
  sed -i -e '/grouptogether\.com/d' $temp_ad_file
+ sed -i -e '/evite\.com/d' $temp_ad_file
  sed -i -e '/analytics\.twitter\.com/d' $temp_ad_file
  # required for taste.com.au
  sed -i -e '/tags\.news\.com\.au/d' $temp_ad_file 
