@@ -69,6 +69,10 @@ fi
 #
 echo 'address=/aa.i-stream.pl/0.0.0.0' >> $ad_file
 
+#ensure no temporary files left over, or DNS will be overloaded with too many entries.
+rm /etc/dnsmasq.d/*.tmp
+rm /etc/dnsmasq.d/sed*
+
 #
 ## restart dnsmasq
 /etc/init.d/dnsmasq force-reload
