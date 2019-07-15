@@ -17,8 +17,6 @@
 #crontab -l should show you now a line to automatically update once a day
 #
 #enjoy!
-# @ar0xa
-
 if grep -q adblock /var/spool/cron/crontabs/root
 then
   echo "Cron OK"
@@ -26,52 +24,68 @@ else
  echo "0 3 * * 0 /config/user-data/update-adblock-dnsmasq.sh" >> /var/spool/cron/crontabs/root
 fi
 
-ad_file="/etc/dnsmasq.d/dnsmasq.adlist.conf"
-temp_ad_file="/etc/dnsmasq.d/dnsmasq.adlist.conf.tmp"
+# Blocklist for ads
+blocklist_url1_1="https://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext"
+# Blocklist for malware
+blocklist_url2_1="https://www.dshield.org/feeds/suspiciousdomains_High.txt"
+blocklist_url2_2="https://www.dshield.org/feeds/suspiciousdomains_Medium.txt"
+blocklist_url2_3="https://www.dshield.org/feeds/suspiciousdomains_Low.txt"
 
-# get two hosts files with 127.0.0.1 adress, extract out only ad blocking lists and write them to a temporary file
-#curl -s "http://sysctl.org/cameleon/hosts" "http://hosts-file.net/ad_servers.txt" "http://www.malwaredomainlist.com/hostslist/hosts.txt" | grep -w ^127.0.0.1$'\(\t\| \)' | sed 's/^127.0.0.1\s\{1,\}//' > $temp_ad_file
+# IP to respond to DNS query if domain is on blocklist
+# IP '0.0.0.0' is a black hole. Per RFC 1122, section 3.2.1.3 "This host on this network. MUST NOT be sent, except as a source address as part of an initialization procedure by which the host learns its own IP address."
+pixelserv_ip="0.0.0.0"
 
-# get another two hosts files with 0.0.0.0 adress, extract out only ad blocking lists, remove whitespace at the end of some lines and output it to temp
-#curl -s "https://raw.githubusercontent.com/notracking/hosts-blocklists/master/hostnames.txt" "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts" "http://winhelp2002.mvps.org/hosts.txt" "http://someonewhocares.org/hosts/zero/hosts" | grep -w ^0.0.0.0 | cut -c 9- | sed 's/\s\{1,\}.*//' >> $temp_ad_file
+# Block configuration to be used by dnsmasq
+blocklist="/etc/dnsmasq.d/dnsmasq-blocklist.conf"
 
-#host only lists
-curl -s "https://raw.githubusercontent.com/Ar0xA/USG-DNS-ADBLOCK/master/youtube-google.txt" "http://mirror1.malwaredomains.com/files/justdomains" "https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist" "https://s3.amazonaws.com/lists.disconnect.me/simple_tracking.txt" "https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt"| grep -v "#" >> $temp_ad_file
+# Temp blocklists
+temp_blocklist1="/tmp/dnsmasq-blocklist1.conf.tmp"
+temp_blocklist2="/tmp/dnsmasq-blocklist2.conf.tmp"
 
-# remove the carriage return at the end of each line of the temporary file, and convert it into a Dnsmasq format
-sed -i -e 's/\r$//; s:.*:address=/&/0\.0\.0\.0:' $temp_ad_file
+curl -s $blocklist_url1_1 | sed "s/127\.0\.0\.1/$pixelserv_ip/" > $temp_blocklist1
+curl -s $blocklist_url2_1 > $temp_blocklist2
+curl -s $blocklist_url2_2 >> $temp_blocklist2
+curl -s $blocklist_url2_3 >> $temp_blocklist2
 
-# get another hosts file in Dnsmasq format, and add the contents to a temporary file
-#curl -s "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=dnsmasq&showintro=0&mimetype=plaintext&useip=0.0.0.0" >> $temp_ad_file
-#curl -s "https://raw.githubusercontent.com/notracking/hosts-blocklists/master/domains.txt" | grep -v "#">> $temp_ad_file
+# Remove comment lines
+sed -i "/^#/d" $temp_blocklist2
+# Remove header line: Site
+sed -i "/Site/d" $temp_blocklist2
+# Add to start of all lines: /address=
+sed -i "s/^/address=\//g" $temp_blocklist2
+# Add to end of all lines: /$pixelserv_ip
+sed -i "s/$/\/$pixelserv_ip/" $temp_blocklist2
 
-if [ -f "$temp_ad_file" ]
+# Join files to one
+cat $temp_blocklist2 >> $temp_blocklist1
+
+# If temp blocklist exists
+if [ -f "$temp_blocklist1" ]
 then
 # sort ad blocking list in the temp file and remove duplicate lines from it
- sort -o $temp_ad_file -t '/' -uk2 $temp_ad_file
+ sort -o $temp_blocklist1 -t '/' -uk2 $temp_blocklist1
 
 # uncomment the line below, and modify it to remove your favorite sites from the ad blocking list
- sed -i -e '/spclient\.wg\.spotify\.com/d' $temp_ad_file
- sed -i -e '/paperlesspost\.com/d' $temp_ad_file
- sed -i -e '/grouptogether\.com/d' $temp_ad_file
- sed -i -e '/evite\.com/d' $temp_ad_file
- sed -i -e '/analytics\.twitter\.com/d' $temp_ad_file
+ sed -i -e '/spclient\.wg\.spotify\.com/d' $temp_blocklist1
+ sed -i -e '/paperlesspost\.com/d' $temp_blocklist1
+ sed -i -e '/grouptogether\.com/d' $temp_blocklist1
+ sed -i -e '/evite\.com/d' $temp_blocklist1
+ sed -i -e '/analytics\.twitter\.com/d' $temp_blocklist1
  # required for taste.com.au
- sed -i -e '/tags\.news\.com\.au/d' $temp_ad_file 
- mv $temp_ad_file $ad_file
+ sed -i -e '/tags\.news\.com\.au/d' $temp_blocklist1 
+
+ # Keep only unique entries
+ sort $temp_blocklist1 | uniq > $blocklist
 else
  echo "Error building the ad list, please try again."
  exit
 fi
 
-#
-## add some specific add hosts
-#
-echo 'address=/aa.i-stream.pl/0.0.0.0' >> $ad_file
-
 #ensure no temporary files left over, or DNS will be overloaded with too many entries.
-rm /etc/dnsmasq.d/*.tmp
-rm /etc/dnsmasq.d/sed*
+rm -f /etc/dnsmasq.d/*.tmp
+rm -f /etc/dnsmasq.d/sed*
+rm -f $tmp_blocklist1
+rm -f $tmp_blocklist2
 
 #
 ## restart dnsmasq
